@@ -2,172 +2,108 @@ const express = require('express');
 const app = express();
 require('dotenv').config();
 const cors = require('cors');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: '*',
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uqgpfrz.mongodb.net/?retryWrites=true&w=majority`;
 
-
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
 async function run() {
   try {
     await client.connect();
-    // const petCollection = client.db("petadoptionDB").collection("pets");
 
-// collection 
+    const petCollection = client.db("assignmentDB").collection("petlist");
+    const donationCollection = client.db("assignmentDB").collection("donation");
+    const assignmentCollection = client.db("assignmentDB").collection("pets");
+    const userCollection = client.db("assignmentDB").collection("info");
 
-    const assignmentCollection = client
-      .db("assignmentDB")
-      .collection("pets");
-// get operation
-
-app.get('/pets', async (req, res) => {
- const cursor=  assignmentCollection.find();
- const result= await cursor.toArray();
- res.send(result);
-});
-
-// for Mylist
-
-app.get('/pets', async (req, res) => {
-  try {
-    const { email } = req.query;
-    if (email) {
-      const cursor = assignmentCollection.find({ email });
-      const pets = await cursor.toArray();
-      res.json(pets);
-    } else {
-      const cursor = assignmentCollection.find();
-      const pets = await cursor.toArray();
-      res.json(pets);
-    }
-  } catch (error) {
-    console.error('Error fetching pets:', error);
-    res.status(500).json({ error: 'Failed to fetch pets' });
-  }
-});
-
-
-// post operation
-
-// post pet form into database
-      app.post("/pets", async (req, res) => {
-        const newPet = req.body;
-        console.log(newPet);
-        const result = await assignmentCollection.insertOne(newPet);
-        res.send(result);
-      });
-
-
-    app.get("/", (req, res) => {
-      res.send("pet adoption hoise");
+    // user releted api
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+     
+      const query = { email: user.email }
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: 'user already exists', insertedId: null })
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
     });
 
-    // Ping MongoDB deployment
+  
+
+
+
+
+    // user related api closed
+
+
+    // Get all pets
+    app.get('/pets', async (req, res) => {
+      const cursor = assignmentCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    // Get donation form
+    app.get('/donation', async (req, res) => {
+      const cursor = donationCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    // Add a new pet
+    app.post("/pets", async (req, res) => {
+      const newPet = req.body;
+      try {
+        const result = await assignmentCollection.insertOne(newPet);
+        res.send(result);
+      } catch (error) {
+        console.error("Error adding pet:", error);
+        res.status(500).json({ error: "Failed to add pet" });
+      }
+    });
+
+    // Add a new donation campaign
+    app.post("/donation", async (req, res) => {
+      const newCampaign = req.body;
+      try {
+        const result = await donationCollection.insertOne(newCampaign);
+        res.send(result);
+      } catch (error) {
+        console.error("Error creating donation campaign:", error);
+        res.status(500).json({ error: "Failed to create donation campaign" });
+      }
+    });
+
+ 
+
+// end
+    app.get("/", (req, res) => {
+      res.send("Pet adoption API is running.");
+    });
+
     await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
-    // Close client connection
+    
     // await client.close();
   }
 }
 
-run()
-  .then(() => {
-    app.listen(port, () => {
-      console.log(`Server is running on port :${port}`);
-    });
-  })
-  .catch(() => {
-    console.dir;
-  });
+run().catch(console.dir);
 
-
-
-
-// const express = require("express");
-// const cors = require("cors");
-// require("dotenv").config();
-// const jwt = require("jsonwebtoken");
-// const cookieParser = require('cookie-parser');
-// const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-
-// const app = express();
-// const port = process.env.PORT || 5000;
-
-// // Middleware
-// app.use(cors());
-// app.use(express.json());
-
-
-// // MongoDB URI
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uqgpfrz.mongodb.net/?retryWrites=true&w=majority`;
-
-// // Create a MongoClient
-// const client = new MongoClient(uri, {
-//   serverApi: {
-//     version: ServerApiVersion.v1,
-//     strict: true,
-//     deprecationErrors: true,
-//   },
-// });
-
-
-
-// // Connect to MongoDB
-// async function run() {
-//   try {
-//     // await client.connect();
-//     const assignmentCollection = client
-//       .db("assignmentDB")
-//       .collection("pets");
-
-//       app.post("/pets", async (req, res) => {
-//         const handleSubmit = req.body;
-//         console.log(handleSubmit);
-//         const result = await assignmentCollection.insertOne(handleSubmit);
-//         res.send(result);
-//       });
-
-
-   
-
-//     app.get("/", (req, res) => {
-//       res.send("pet adoption hocche!");
-//     });
-
-//     // Ping MongoDB deployment
-//     // await client.db("admin").command({ ping: 1 });
-//     console.log(
-//       "Pinged your deployment. You successfully connected to MongoDB!"
-//     );
-//   } finally {
-//     // Close client connection
-//     // await client.close();
-//   }
-// }
-
-// run()
-//   .then(() => {
-//     app.listen(port, () => {
-//       console.log(`Server is running on port :${port}`);
-//     });
-//   })
-//   .catch(() => {
-//     console.dir;
-//   });
-
-// // Default route
-
-// // Start server
+app.listen(port, () => {
+  console.log(`Server is running on port: ${port}`);
+});
