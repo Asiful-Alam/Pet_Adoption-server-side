@@ -136,6 +136,43 @@ app.patch('/users/admin/:id',verifyToken,verifyAdmin, async (req, res) => {
       res.send(result);
     });
 
+    // delete pet from admin
+    app.delete('/pets/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await assignmentCollection.deleteOne(query);
+      res.send(result);
+    });
+    // update pet info :admin
+    // Update a pet
+app.patch('/pets/:id', verifyToken, verifyAdmin, async (req, res) => {
+  const id = req.params.id;
+  const updatedPet = req.body;
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: {
+      name: updatedPet.name,
+      age: updatedPet.age,
+      shortDescription: updatedPet.shortDescription,      shortDescription: updatedPet.shortDescription,
+      category: updatedPet.category,
+      location: updatedPet.location,
+      adopted: updatedPet.adopted
+    },
+  };
+  try {
+    const result = await assignmentCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    console.error("Error updating pet:", error);
+    res.status(500).send({ message: "Failed to update pet" });
+  }
+});
+// admin change adopted or not adopted
+
+
+
+
+    
     // Get donation form
     app.get('/donation', async (req, res) => {
       const cursor = donationCollection.find();
