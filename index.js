@@ -174,11 +174,41 @@ app.patch('/pets/:id', verifyToken, verifyAdmin, async (req, res) => {
 
     
     // Get donation form
-    app.get('/donation', async (req, res) => {
-      const cursor = donationCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
+    app.get("/donations", async (req, res) => {
+      const { page = 1, limit = 10 } = req.query;
+      const skip = (page - 1) * limit;
+    
+      try {
+        const campaigns = await donationCollection
+          .find({})
+          .sort({ createdAt: -1 }) // Sort by date in descending order
+          .skip(parseInt(skip))
+          .limit(parseInt(limit))
+          .toArray();
+        res.send(campaigns);
+      } catch (error) {
+        console.error("Error fetching campaigns:", error);
+        res.status(500).json({ error: "Failed to fetch campaigns" });
+      }
     });
+    // Get details of a specific donation campaign
+app.get('/donations/:id', async (req, res) => {
+  const campaignId = req.params.id; // Retrieve the campaign ID from the request parameters
+
+  try {
+    const campaign = await donationCollection.findOne({ _id: new ObjectId(campaignId) }); // Find the campaign by its ID in the donation collection
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campaign not found' }); // Return a 404 response if campaign is not found
+    }
+    res.json(campaign); // Send the campaign details as a JSON response
+  } catch (error) {
+    console.error('Error fetching campaign details:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign details' }); // Return a 500 response if there's an error
+  }
+});
+
+    
+    
 
     // Add a new pet
     app.post("/pets", async (req, res) => {
