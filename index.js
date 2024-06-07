@@ -3,6 +3,7 @@ const app = express();
 require("dotenv").config();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const { MongoClient, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 5000;
@@ -31,6 +32,7 @@ async function run() {
     const donationCollection = client.db("assignmentDB").collection("donation");
     const assignmentCollection = client.db("assignmentDB").collection("pets");
     const userCollection = client.db("assignmentDB").collection("info");
+    // const myCampaignsCollection = client.db("assignmentDB").collection("mycampaigns");
 
     // middleware for jwt
 
@@ -167,7 +169,7 @@ async function run() {
     // admin change adopted or not adopted
 
     // Get donation form
-    app.get("/donations", async (req, res) => {
+    app.get("/donation", async (req, res) => {
       const { page = 1, limit = 10 } = req.query;
       const skip = (page - 1) * limit;
 
@@ -185,9 +187,8 @@ async function run() {
       }
     });
 
-
 // get campaign aDMIN 
-app.get('/donations', async (req, res) => {
+app.get('/donation', async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (page - 1) * limit;
 
@@ -214,7 +215,7 @@ app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
 
 
     // Get details of a specific donation campaign
-    app.get("/donations/:id", async (req, res) => {
+    app.get("/donation/:id", async (req, res) => {
       const campaignId = req.params.id; // Retrieve the campaign ID from the request parameters
 
       try {
@@ -269,6 +270,7 @@ app.get("/pets/:email", async (req, res) => {
         res.status(500).json({ error: "Failed to create donation campaign" });
       }
     });
+
     // Get campaign details created by a specific user
     app.get("/mycampaigns/:email", async (req, res) => {
       const userEmail = req.params.email;
@@ -280,10 +282,8 @@ app.get("/pets/:email", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch user campaigns" });
       }
     });
-    
-    
 
-    // JWT releted api
+    // JWT related API
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -292,7 +292,78 @@ app.get("/pets/:email", async (req, res) => {
       res.send({ token });
     });
 
-    // end
+    // Payment intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100); // Convert to smallest currency unit (e.g., cents)
+  
+      try {
+          const paymentIntent = await stripe.paymentIntents.create({
+              amount: amount,
+              currency: "USD",
+              payment_method_types: ['card'],
+          });
+          res.send({
+              clientSecret: paymentIntent.client_secret,
+          });
+      } catch (error) {
+          console.error("Error creating payment intent:", error);
+          res.status(500).send({ error: "Failed to create payment intent" });
+      }
+  });
+  
+
+    // Update donation amount
+    app.post("/update-donation/:id", async (req, res) => {
+      const { id } = req.params;
+      const { amount, email } = req.body;  // Include email in the request body
+    
+      try {
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $inc: { donatedAmount: amount },
+        };
+    
+        const result = await donationCollection.updateOne(filter, updateDoc);
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ error: "Campaign not found" });
+        }
+    
+        const updatedCampaign = await donationCollection.findOne(filter);
+    
+        // Save the donation information along with the user's email
+        await donationCollection.insertOne({
+          campaignId: id,
+          donatedAmount: amount,
+          email,  // Save user's email with the donation
+          createdAt: new Date()
+        });
+    
+        res.send({ updatedAmount: updatedCampaign.donatedAmount });
+      } catch (error) {
+        console.error("Error updating donation amount:", error);
+        res.status(500).send({ error: "Failed to update donation amount" });
+      }
+    });
+    
+
+    // Assuming you have already implemented routes to handle donations
+
+// Get donations by user email
+app.get("/mycampaigns/:email", async (req, res) => {
+  const userEmail = req.params.email;
+  try {
+    // Retrieve donations associated with the user's email
+    const donations = await donationCollection.find({ email: userEmail }).toArray();
+    res.json(donations);
+  } catch (error) {
+    console.error("Error fetching user donations:", error);
+    res.status(500).json({ error: "Failed to fetch user donations" });
+  }
+});
+
+
+    // End
     app.get("/", (req, res) => {
       res.send("Pet adoption API is running.");
     });
@@ -311,3 +382,4 @@ run().catch(console.dir);
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
+
