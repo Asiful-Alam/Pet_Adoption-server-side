@@ -3,18 +3,18 @@ const app = express();
 require("dotenv").config();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin:[ 
-    'http://localhost:5173'
-  ],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uqgpfrz.mongodb.net/?retryWrites=true&w=majority`;
@@ -32,6 +32,8 @@ async function run() {
     const donationCollection = client.db("assignmentDB").collection("donation");
     const assignmentCollection = client.db("assignmentDB").collection("pets");
     const userCollection = client.db("assignmentDB").collection("info");
+    const adoptCollection = client.db("assignmentDB").collection("adoptions");
+    const paymentCollection = client.db("assignmentDB").collection("payment");
     // const myCampaignsCollection = client.db("assignmentDB").collection("mycampaigns");
 
     // middleware for jwt
@@ -134,6 +136,66 @@ async function run() {
       res.send(result);
     });
 
+    //get  allpetdetails
+   
+// Get details of a specific pet
+app.get("/pets/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const pet = await assignmentCollection.findOne({
+      _id: new ObjectId(id),
+    });
+    if (!pet) {
+      return res.status(404).json({ message: "Pet not found" });
+    }
+    res.json(pet);
+  } catch (error) {
+    console.error("Error fetching pet details:", error);
+    res.status(500).json({ error: "Failed to fetch pet details" });
+  }
+});
+// Get pets by user email
+app.get("/pets/email/:email", async (req, res) => {
+  const userEmail = req.params.email;
+  try {
+    const pets = await assignmentCollection
+      .find({ email: userEmail })
+      .toArray();
+    res.json(pets);
+  } catch (error) {
+    console.error("Error fetching pets:", error);
+    res.status(500).json({ error: "Failed to fetch pets" });
+  }
+});
+
+    // Add a new adoption request
+    // Add a new adoption request
+    app.post("/adoption", async (req, res) => {
+      const newAdoption = req.body;
+      try {
+        const result = await client
+          .db("assignmentDB")
+          .collection("adoptions")
+          .insertOne(newAdoption);
+        res.send(result);
+      } catch (error) {
+        console.error("Error creating adoption request:", error);
+        res.status(500).json({ error: "Failed to create adoption request" });
+      }
+    });
+
+    // GET adoption requests by user email
+app.get("/adoption/:email", async (req, res) => {
+  try {
+    const adoptionRequests = await AdoptionRequest.find({ userEmail: req.params.email });
+    res.json(adoptionRequests);
+  } catch (error) {
+    console.error("Error fetching adoption requests:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+    
     // delete pet from admin
     app.delete("/pets/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
@@ -187,32 +249,31 @@ async function run() {
       }
     });
 
-// get campaign aDMIN 
-app.get('/donation', async (req, res) => {
-  const { page = 1, limit = 50 } = req.query;
-  const skip = (page - 1) * limit;
+    // get campaign aDMIN
+    app.get("/donation", async (req, res) => {
+      const { page = 1, limit = 50 } = req.query;
+      const skip = (page - 1) * limit;
 
-  try {
-    const campaigns = await donationCollection
-      .find({})
-      .sort({ createdAt: -1 }) // Sort by date in descending order
-      .skip(parseInt(skip))
-      .limit(parseInt(limit))
-      .toArray();
-    res.send(campaigns);
-  } catch (error) {
-    console.error("Error fetching campaigns:", error);
-    res.status(500).json({ error: "Failed to fetch campaigns" });
-  }
-});
-// delete campaign from admin
-app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
-  const id = req.params.id;
-  const query = { _id: new ObjectId(id) };
-  const result = await donationCollection.deleteOne(query);
-  res.send(result);
-});
-
+      try {
+        const campaigns = await donationCollection
+          .find({})
+          .sort({ createdAt: -1 }) // Sort by date in descending order
+          .skip(parseInt(skip))
+          .limit(parseInt(limit))
+          .toArray();
+        res.send(campaigns);
+      } catch (error) {
+        console.error("Error fetching campaigns:", error);
+        res.status(500).json({ error: "Failed to fetch campaigns" });
+      }
+    });
+    // delete campaign from admin
+    app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await donationCollection.deleteOne(query);
+      res.send(result);
+    });
 
     // Get details of a specific donation campaign
     app.get("/donation/:id", async (req, res) => {
@@ -243,21 +304,20 @@ app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
         res.status(500).json({ error: "Failed to add pet" });
       }
     });
-// my added pet
-// Assuming you are using Express.js
-app.get("/pets/:email", async (req, res) => {
-  const userEmail = req.params.email;
-  try {
-    const pets = await assignmentCollection.find({ email: userEmail }).toArray();
-    res.json(pets);
-  } catch (error) {
-    console.error("Error fetching pets:", error);
-    res.status(500).json({ error: "Failed to fetch pets" });
-  }
-});
+    // my added pet
 
-
-
+    app.get("/pets/:email", async (req, res) => {
+      const userEmail = req.params.email;
+      try {
+        const pets = await assignmentCollection
+          .find({ email: userEmail })
+          .toArray();
+        res.json(pets);
+      } catch (error) {
+        console.error("Error fetching pets:", error);
+        res.status(500).json({ error: "Failed to fetch pets" });
+      }
+    });
 
     // Add a new donation campaign
     app.post("/donation", async (req, res) => {
@@ -276,7 +336,9 @@ app.get("/pets/:email", async (req, res) => {
       const userEmail = req.params.email;
       console.log("Fetching campaigns for user:", userEmail);
       try {
-        const campaigns = await donationCollection.find({ email: userEmail }).toArray();
+        const campaigns = await donationCollection
+          .find({ email: userEmail })
+          .toArray();
         console.log("Found campaigns:", campaigns);
         res.json(campaigns);
       } catch (error) {
@@ -284,7 +346,6 @@ app.get("/pets/:email", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch user campaigns" });
       }
     });
-    
 
     // JWT related API
     app.post("/jwt", async (req, res) => {
@@ -297,113 +358,125 @@ app.get("/pets/:email", async (req, res) => {
 
     // Payment intent
     app.post("/create-payment-intent", async (req, res) => {
-      const { price } = req.body;
+      const { price, email } = req.body;
       const amount = parseInt(price * 100); // Convert to smallest currency unit (e.g., cents)
-  
+
       try {
-          const paymentIntent = await stripe.paymentIntents.create({
-              amount: amount,
-              currency: "USD",
-              payment_method_types: ['card'],
-          });
-          res.send({
-              clientSecret: paymentIntent.client_secret,
-          });
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "USD",
+          payment_method_types: ["card"],
+        });
+
+        // Save payment details into database
+        const payment = {
+          amount: price,
+          email: email,
+          createdAt: new Date(),
+          // You can include more payment details here as needed
+        };
+
+        await paymentCollection.insertOne(payment);
+
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
       } catch (error) {
-          console.error("Error creating payment intent:", error);
-          res.status(500).send({ error: "Failed to create payment intent" });
+        console.error("Error creating payment intent:", error);
+        res.status(500).send({ error: "Failed to create payment intent" });
       }
-  });
-  
+    });
 
     // Update donation amount
     app.post("/update-donation/:id", async (req, res) => {
       const { id } = req.params;
-      const { amount, email } = req.body;  // Include email in the request body
-    
+      const { amount, email } = req.body; // Include email in the request body
+
       try {
         const filter = { _id: new ObjectId(id) };
         const updateDoc = {
           $inc: { donatedAmount: amount },
         };
-    
+
         const result = await donationCollection.updateOne(filter, updateDoc);
         if (result.matchedCount === 0) {
           return res.status(404).send({ error: "Campaign not found" });
         }
-    
+
         const updatedCampaign = await donationCollection.findOne(filter);
-    
+
         // Save the donation information along with the user's email
         await donationCollection.insertOne({
           campaignId: id,
           donatedAmount: amount,
-          email,  // Save user's email with the donation
-          createdAt: new Date()
+          email, // Save user's email with the donation
+          createdAt: new Date(),
         });
-    
+
         res.send({ updatedAmount: updatedCampaign.donatedAmount });
       } catch (error) {
         console.error("Error updating donation amount:", error);
         res.status(500).send({ error: "Failed to update donation amount" });
       }
     });
-    
 
     // Assuming you have already implemented routes to handle donations
 
-// Get donations by user email
-// app.get("/mycampaigns/:email", async (req, res) => {
-//   const userEmail = req.params.email;
-//   try {
-//     // Retrieve donations associated with the user's email
-//     const donations = await donationCollection.find({ email: userEmail }).toArray();
-//     res.json(donations);
-//   } catch (error) {
-//     console.error("Error fetching user donations:", error);
-//     res.status(500).json({ error: "Failed to fetch user donations" });
-//   }
-// });
+    // Get donations by user email
+    // app.get("/mycampaigns/:email", async (req, res) => {
+    //   const userEmail = req.params.email;
+    //   try {
+    //     // Retrieve donations associated with the user's email
+    //     const donations = await donationCollection.find({ email: userEmail }).toArray();
+    //     res.json(donations);
+    //   } catch (error) {
+    //     console.error("Error fetching user donations:", error);
+    //     res.status(500).json({ error: "Failed to fetch user donations" });
+    //   }
+    // });
 
-// Handle refund requests
-app.post('/refund/:id', verifyToken, async (req, res) => {
-  const donationId = req.params.id;
+    // Handle refund requests
+    app.post("/refund/:id", verifyToken, async (req, res) => {
+      const donationId = req.params.id;
 
-  try {
-    const donation = await donationCollection.findOne({ _id: new ObjectId(donationId) });
-    if (!donation) {
-      return res.status(404).send({ success: false, message: 'Donation not found' });
-    }
+      try {
+        const donation = await donationCollection.findOne({
+          _id: new ObjectId(donationId),
+        });
+        if (!donation) {
+          return res
+            .status(404)
+            .send({ success: false, message: "Donation not found" });
+        }
 
-    // Perform refund logic here (e.g., using Stripe's API)
-    // ...
+        // Perform refund logic here (e.g., using Stripe's API)
+        // ...
 
-    // If refund is successful, remove the donation record
-    await donationCollection.deleteOne({ _id: new ObjectId(donationId) });
+        // If refund is successful, remove the donation record
+        await donationCollection.deleteOne({ _id: new ObjectId(donationId) });
 
-    res.send({ success: true, message: 'Refund processed successfully' });
-  } catch (error) {
-    console.error('Error processing refund:', error);
-    res.status(500).send({ success: false, message: 'Failed to process refund' });
-  }
-});
+        res.send({ success: true, message: "Refund processed successfully" });
+      } catch (error) {
+        console.error("Error processing refund:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to process refund" });
+      }
+    });
 
-// Get donations by user email
-// Get donations by user email
-app.get("/donation/:email", async (req, res) => {
-  const userEmail = req.params.email;
-  try {
-    const donations = await donationCollection.find({ email: userEmail }).toArray();
-    res.json(donations);
-  } catch (error) {
-    console.error("Error fetching user donations:", error);
-    res.status(500).json({ error: "Failed to fetch user donations" });
-  }
-});
-
-
-
-
+    // Get donations by user email
+    app.get("/donation/:email", async (req, res) => {
+      const userEmail = req.params.email;
+      try {
+        const donations = await donationCollection
+          .find({ email: userEmail })
+          .toArray();
+        res.json(donations);
+      } catch (error) {
+        console.error("Error fetching user donations:", error);
+        res.status(500).json({ error: "Failed to fetch user donations" });
+      }
+    });
 
     // End
     app.get("/", (req, res) => {
@@ -424,4 +497,3 @@ run().catch(console.dir);
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
-
