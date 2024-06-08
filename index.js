@@ -274,14 +274,17 @@ app.get("/pets/:email", async (req, res) => {
     // Get campaign details created by a specific user
     app.get("/mycampaigns/:email", async (req, res) => {
       const userEmail = req.params.email;
+      console.log("Fetching campaigns for user:", userEmail);
       try {
         const campaigns = await donationCollection.find({ email: userEmail }).toArray();
+        console.log("Found campaigns:", campaigns);
         res.json(campaigns);
       } catch (error) {
         console.error("Error fetching user campaigns:", error);
         res.status(500).json({ error: "Failed to fetch user campaigns" });
       }
     });
+    
 
     // JWT related API
     app.post("/jwt", async (req, res) => {
@@ -350,10 +353,46 @@ app.get("/pets/:email", async (req, res) => {
     // Assuming you have already implemented routes to handle donations
 
 // Get donations by user email
-app.get("/mycampaigns/:email", async (req, res) => {
+// app.get("/mycampaigns/:email", async (req, res) => {
+//   const userEmail = req.params.email;
+//   try {
+//     // Retrieve donations associated with the user's email
+//     const donations = await donationCollection.find({ email: userEmail }).toArray();
+//     res.json(donations);
+//   } catch (error) {
+//     console.error("Error fetching user donations:", error);
+//     res.status(500).json({ error: "Failed to fetch user donations" });
+//   }
+// });
+
+// Handle refund requests
+app.post('/refund/:id', verifyToken, async (req, res) => {
+  const donationId = req.params.id;
+
+  try {
+    const donation = await donationCollection.findOne({ _id: new ObjectId(donationId) });
+    if (!donation) {
+      return res.status(404).send({ success: false, message: 'Donation not found' });
+    }
+
+    // Perform refund logic here (e.g., using Stripe's API)
+    // ...
+
+    // If refund is successful, remove the donation record
+    await donationCollection.deleteOne({ _id: new ObjectId(donationId) });
+
+    res.send({ success: true, message: 'Refund processed successfully' });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    res.status(500).send({ success: false, message: 'Failed to process refund' });
+  }
+});
+
+// Get donations by user email
+// Get donations by user email
+app.get("/donation/:email", async (req, res) => {
   const userEmail = req.params.email;
   try {
-    // Retrieve donations associated with the user's email
     const donations = await donationCollection.find({ email: userEmail }).toArray();
     res.json(donations);
   } catch (error) {
@@ -361,6 +400,9 @@ app.get("/mycampaigns/:email", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch user donations" });
   }
 });
+
+
+
 
 
     // End
