@@ -34,7 +34,7 @@ async function run() {
     const userCollection = client.db("assignmentDB").collection("info");
     const adoptCollection = client.db("assignmentDB").collection("adoptions");
     const paymentCollection = client.db("assignmentDB").collection("payment");
-    // const myCampaignsCollection = client.db("assignmentDB").collection("mycampaigns");
+    const myCampaignsCollection = client.db("assignmentDB").collection("mycampaigns");
 
     // middleware for jwt
 
@@ -358,6 +358,27 @@ app.post("/pets", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch user campaigns" });
       }
     });
+    // Update a donation campaign
+// app.patch("/donation/:id", async (req, res) => {
+//   const campaignId = req.params.id;
+//   const updatedData = req.body;
+
+//   try {
+//     const result = await donationCollection.updateOne(
+//       { _id: ObjectId(campaignId) },
+//       { $set: updatedData }
+//     );
+//     if (result.modifiedCount > 0) {
+//       res.json({ message: "Campaign updated successfully" });
+//     } else {
+//       res.status(404).json({ error: "Campaign not found" });
+//     }
+//   } catch (error) {
+//     console.error("Error updating campaign:", error);
+//     res.status(500).json({ error: "Failed to update campaign" });
+//   }
+// });
+
 
     // JWT related API
     app.post("/jwt", async (req, res) => {
