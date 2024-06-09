@@ -155,13 +155,16 @@ app.get("/pets/:id", async (req, res) => {
   }
 });
 // Get pets by user email
-app.get("/pets/email/:email", async (req, res) => {
+app.get("/mypets/:email", async (req, res) => {
   const userEmail = req.params.email;
+  console.log("Fetching my pet for specific user:", 
+    userEmail);
   try {
     const pets = await assignmentCollection
       .find({ email: userEmail })
       .toArray();
     res.json(pets);
+    console.log("Found campaigns:", pets);
   } catch (error) {
     console.error("Error fetching pets:", error);
     res.status(500).json({ error: "Failed to fetch pets" });
@@ -169,31 +172,38 @@ app.get("/pets/email/:email", async (req, res) => {
 });
 
     // Add a new adoption request
-    // Add a new adoption request
     app.post("/adoption", async (req, res) => {
-      const newAdoption = req.body;
+      const adoptionData = req.body;
       try {
         const result = await client
           .db("assignmentDB")
           .collection("adoptions")
-          .insertOne(newAdoption);
+          .insertOne(adoptionData);
         res.send(result);
       } catch (error) {
         console.error("Error creating adoption request:", error);
         res.status(500).json({ error: "Failed to create adoption request" });
       }
     });
+    
 
     // GET adoption requests by user email
-app.get("/adoption/:email", async (req, res) => {
-  try {
-    const adoptionRequests = await AdoptionRequest.find({ userEmail: req.params.email });
-    res.json(adoptionRequests);
-  } catch (error) {
-    console.error("Error fetching adoption requests:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+    app.get("/adoption/:email", async (req, res) => {
+      const userEmail = req.params.email;
+      console.log("Fetching adoption requests for user:", userEmail);
+      try {
+        const adoptionRequests = await client
+          .db("assignmentDB")
+          .collection("adoptions")
+          .find({ userEmail })
+          .toArray();
+        res.json(adoptionRequests);
+      } catch (error) {
+        console.error("Error fetching adoption requests:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+    
 
     
     // delete pet from admin
@@ -294,30 +304,32 @@ app.get("/adoption/:email", async (req, res) => {
     });
 
     // Add a new pet
-    app.post("/pets", async (req, res) => {
-      const newPet = req.body;
-      try {
-        const result = await assignmentCollection.insertOne(newPet);
-        res.send(result);
-      } catch (error) {
-        console.error("Error adding pet:", error);
-        res.status(500).json({ error: "Failed to add pet" });
-      }
-    });
+   // Add a new pet
+app.post("/pets", async (req, res) => {
+  const newPet = req.body;
+  try {
+    const result = await assignmentCollection.insertOne(newPet);
+    res.send(result);
+  } catch (error) {
+    console.error("Error adding pet:", error);
+    res.status(500).json({ error: "Failed to add pet" });
+  }
+});
+
     // my added pet
 
-    app.get("/pets/:email", async (req, res) => {
-      const userEmail = req.params.email;
-      try {
-        const pets = await assignmentCollection
-          .find({ email: userEmail })
-          .toArray();
-        res.json(pets);
-      } catch (error) {
-        console.error("Error fetching pets:", error);
-        res.status(500).json({ error: "Failed to fetch pets" });
-      }
-    });
+    // app.get("/pets/:email", async (req, res) => {
+    //   const userEmail = req.params.email;
+    //   try {
+    //     const pets = await assignmentCollection
+    //       .find({ email: userEmail })
+    //       .toArray();
+    //     res.json(pets);
+    //   } catch (error) {
+    //     console.error("Error fetching pets:", error);
+    //     res.status(500).json({ error: "Failed to fetch pets" });
+    //   }
+    // });
 
     // Add a new donation campaign
     app.post("/donation", async (req, res) => {
@@ -356,69 +368,69 @@ app.get("/adoption/:email", async (req, res) => {
       res.send({ token });
     });
 
-    // Payment intent
-    app.post("/create-payment-intent", async (req, res) => {
-      const { price, email } = req.body;
-      const amount = parseInt(price * 100); // Convert to smallest currency unit (e.g., cents)
+   // Payment intent
+app.post("/create-payment-intent", async (req, res) => {
+  const { price, email } = req.body;
+  const amount = parseInt(price * 100); // Convert to smallest currency unit (e.g., cents)
 
-      try {
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: amount,
-          currency: "USD",
-          payment_method_types: ["card"],
-        });
-
-        // Save payment details into database
-        const payment = {
-          amount: price,
-          email: email,
-          createdAt: new Date(),
-          // You can include more payment details here as needed
-        };
-
-        await paymentCollection.insertOne(payment);
-
-        res.send({
-          clientSecret: paymentIntent.client_secret,
-        });
-      } catch (error) {
-        console.error("Error creating payment intent:", error);
-        res.status(500).send({ error: "Failed to create payment intent" });
-      }
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: "USD",
+      payment_method_types: ["card"],
     });
 
-    // Update donation amount
-    app.post("/update-donation/:id", async (req, res) => {
-      const { id } = req.params;
-      const { amount, email } = req.body; // Include email in the request body
+    // Save payment details into database
+    const payment = {
+      amount: price,
+      email: email,
+      createdAt: new Date(),
+      // You can include more payment details here as needed
+    };
 
-      try {
-        const filter = { _id: new ObjectId(id) };
-        const updateDoc = {
-          $inc: { donatedAmount: amount },
-        };
+    await paymentCollection.insertOne(payment);
 
-        const result = await donationCollection.updateOne(filter, updateDoc);
-        if (result.matchedCount === 0) {
-          return res.status(404).send({ error: "Campaign not found" });
-        }
-
-        const updatedCampaign = await donationCollection.findOne(filter);
-
-        // Save the donation information along with the user's email
-        await donationCollection.insertOne({
-          campaignId: id,
-          donatedAmount: amount,
-          email, // Save user's email with the donation
-          createdAt: new Date(),
-        });
-
-        res.send({ updatedAmount: updatedCampaign.donatedAmount });
-      } catch (error) {
-        console.error("Error updating donation amount:", error);
-        res.status(500).send({ error: "Failed to update donation amount" });
-      }
+    res.send({
+      clientSecret: paymentIntent.client_secret,
     });
+  } catch (error) {
+    console.error("Error creating payment intent:", error);
+    res.status(500).send({ error: "Failed to create payment intent" });
+  }
+});
+
+// Update donation amount
+app.post("/update-donation/:id", async (req, res) => {
+  const { id } = req.params;
+  const { amount, email } = req.body; // Include email in the request body
+  try {
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $inc: { donatedAmount: amount },
+    };
+
+    const result = await donationCollection.updateOne(filter, updateDoc);
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ error: "Campaign not found" });
+    }
+
+    const updatedCampaign = await donationCollection.findOne(filter);
+
+    // Save the donation information along with the user's email
+    await donationCollection.insertOne({
+      campaignId: id,
+      donatedAmount: amount,
+      email, // Save user's email with the donation
+      createdAt: new Date(),
+    });
+
+    res.send({ updatedAmount: updatedCampaign.donatedAmount });
+  } catch (error) {
+    console.error("Error updating donation amount:", error);
+    res.status(500).send({ error: "Failed to update donation amount" });
+  }
+});
+
 
     // Assuming you have already implemented routes to handle donations
 
@@ -435,35 +447,53 @@ app.get("/adoption/:email", async (req, res) => {
     //   }
     // });
 
-    // Handle refund requests
-    app.post("/refund/:id", verifyToken, async (req, res) => {
-      const donationId = req.params.id;
+// Fetch donations by user email
+app.get("/userpayment/:email", async (req, res) => {
+  const { email } = req.params;
+  try {
+    const donations = await paymentCollection.find({ email }).toArray();
+    res.send(donations);
+  } catch (error) {
+    console.error("Error fetching donations:", error);
+    res.status(500).send({ error: "Failed to fetch donations" });
+  }
+});
 
-      try {
-        const donation = await donationCollection.findOne({
-          _id: new ObjectId(donationId),
-        });
-        if (!donation) {
-          return res
-            .status(404)
-            .send({ success: false, message: "Donation not found" });
-        }
 
-        // Perform refund logic here (e.g., using Stripe's API)
-        // ...
+// Process refund
+app.post('/refund/:donationId', async (req, res) => {
+  const { donationId } = req.params;
+  try {
+    // Logic to process the refund
+    const result = await paymentCollection.deleteOne({ _id: new ObjectId(donationId) });
+    if (result.deletedCount === 1) {
+      res.status(200).send({ success: true });
+    } else {
+      res.status(404).send({ error: "Donation not found" });
+    }
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+});
 
-        // If refund is successful, remove the donation record
-        await donationCollection.deleteOne({ _id: new ObjectId(donationId) });
 
-        res.send({ success: true, message: "Refund processed successfully" });
-      } catch (error) {
-        console.error("Error processing refund:", error);
-        res
-          .status(500)
-          .send({ success: false, message: "Failed to process refund" });
-      }
-    });
+//     // Create a refund with Stripe
+//     const refund = await stripe.refunds.create({
+//       payment_intent: donation.paymentIntentId,
+//     });
 
+//     // Remove the donation from the database
+//     await paymentCollection.deleteOne({ _id: new ObjectId(donationId) });
+
+//     res.send({ success: true, refund });
+//   } catch (error) {
+//     console.error("Error processing refund:", error);
+//     res.status(500).send({ error: "Failed to process refund" });
+//   }
+// });
+
+    
     // Get donations by user email
     app.get("/donation/:email", async (req, res) => {
       const userEmail = req.params.email;
