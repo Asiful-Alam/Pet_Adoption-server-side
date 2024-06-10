@@ -11,7 +11,10 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173",
+      "full-project-pet.web.app",
+      "full-project-pet.firebaseapp.com"
+    ],
     credentials: true,
   })
 );
@@ -170,6 +173,39 @@ app.get("/mypets/:email", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch pets" });
   }
 });
+  // Delete pet from user dashboard
+  app.delete("/pets/:id", async (req, res) => {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await assignmentCollection.deleteOne(query);
+    res.send(result);
+  });
+ // Update a pet
+app.put('/pets/:id', async (req, res) => {
+  const id = req.params.id;
+  const { name, category, image, adopted } = req.body;
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: {
+      name: name,
+      category: category,
+      image: image,
+      adopted: adopted
+    }
+  };
+  try {
+    const result = await assignmentCollection.updateOne(filter, updateDoc);
+    if (result.modifiedCount === 1) {
+      res.status(200).send({ message: 'Pet updated successfully' });
+    } else {
+      res.status(404).send({ message: 'Pet not found' });
+    }
+  } catch (error) {
+    console.error('Error updating pet:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+});
+
 
     // Add a new adoption request
     app.post("/adoption", async (req, res) => {
@@ -203,7 +239,7 @@ app.get("/mypets/:email", async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
       }
     });
-    
+  
 
     
     // delete pet from admin
@@ -278,12 +314,52 @@ app.get("/mypets/:email", async (req, res) => {
       }
     });
     // delete campaign from admin
-    app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await donationCollection.deleteOne(query);
-      res.send(result);
-    });
+   // delete donation from admin
+   app.delete("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await donationCollection.deleteOne(query);
+    res.send(result);
+  });
+// Backend route for updating donation details FOR ADMIN
+// app.put("/donation/:id", verifyToken, verifyAdmin, async (req, res) => {
+//   const id = req.params.id;
+//   const updatedDonation = req.body;
+
+//   try {
+//     const result = await donationCollection.updateOne(
+//       { _id: ObjectId(id) },
+//       { $set: updatedDonation }
+//     );
+
+//     if (result.modifiedCount === 1) {
+//       res.json({ message: "Donation updated successfully" });
+//     } else {
+//       res.status(404).json({ error: "Donation not found or no changes made" });
+//     }
+//   } catch (error) {
+//     console.error("Error updating donation:", error);
+//     res.status(500).json({ error: "Failed to update donation" });
+//   }
+// });
+
+// admin donation paused button
+// app.put("/donation/:id/pause", verifyToken, verifyAdmin, async (req, res) => {
+//   const id = req.params.id;
+//   const { isPaused } = req.body;
+//   try {
+//     const result = await donationCollection.updateOne(
+//       { _id: new ObjectId(id) },
+//       { $set: { isPaused: isPaused } }
+//     );
+//     res.json({ message: "Donation status updated successfully" });
+//   } catch (error) {
+//     console.error("Error updating donation status:", error);
+//     res.status(500).json({ error: "Failed to update donation status" });
+//   }
+// });
+
+
 
     // Get details of a specific donation campaign
     app.get("/donation/:id", async (req, res) => {
@@ -378,6 +454,46 @@ app.post("/pets", async (req, res) => {
 //     res.status(500).json({ error: "Failed to update campaign" });
 //   }
 // });
+// PUT route to update a donation
+// Update a donation
+// Update a donation
+app.put('/donation/:id', async (req, res) => {
+  const id = req.params.id;
+  const { maxDonation, lastDate, email } = req.body;
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: {
+      maxDonation: maxDonation,
+      lastDate: lastDate,
+      email: email
+    }
+  };
+  try {
+    const result = await donationCollection.updateOne(filter, updateDoc);
+    if (result.modifiedCount === 1) {
+      res.status(200).send({ message: 'Donation updated successfully' });
+    } else {
+      res.status(404).send({ message: 'Donation not found' });
+    }
+  } catch (error) {
+    console.error('Error updating donation:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+});
+// display donation into that _id
+app.get('/donation/:id/donators', async (req, res) => {
+  const campaignId = req.params.id;
+  try {
+    // Assuming you have a database collection named 'donations' with a field 'campaignId'
+    const donations = await Donation.find({ campaignId });
+    res.json({ donators: donations });
+  } catch (error) {
+    console.error('Error fetching donators:', error);
+    res.status(500).json({ error: 'Failed to fetch donators' });
+  }
+});
+
+
 
 
     // JWT related API
@@ -529,6 +645,32 @@ app.post('/refund/:donationId', async (req, res) => {
       }
     });
 
+
+
+//     // POST endpoint to handle adoption requests
+// app.post('/adoptionRequests', async (req, res) => {
+//   try {
+//       const { petId, petName, petImage, userName, userEmail, phone, address } = req.body;
+      
+//       const adoptionRequest = new AdoptionRequest({
+//           petId,
+//           petName,
+//           petImage,
+//           userName,
+//           userEmail,
+//           phone,
+//           address
+//       });
+      
+//       await adoptionRequest.save();
+  
+//       res.status(201).json({ message: 'Adoption request submitted successfully' });
+//   } catch (error) {
+//       console.error('Error submitting adoption request:', error);
+//       res.status(500).json({ error: 'Internal server error' });
+//   }
+// });
+
     // End
     app.get("/", (req, res) => {
       res.send("Pet adoption API is running.");
@@ -543,8 +685,12 @@ app.post('/refund/:donationId', async (req, res) => {
   }
 }
 
-run().catch(console.dir);
-
-app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
-});
+run()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server is running on port :${port}`);
+    });
+  })
+  .catch(() => {
+    console.dir;
+  });
