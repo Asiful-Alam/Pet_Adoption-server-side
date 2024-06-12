@@ -8,12 +8,14 @@ const { MongoClient, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 5000;
 
+
+
 // Middleware
 app.use(
   cors({
     origin: ["http://localhost:5173",
-      "full-project-pet.web.app",
-      "full-project-pet.firebaseapp.com"
+      "https://full-project-pet.web.app",
+      "https://full-project-pet.firebaseapp.com"
     ],
     credentials: true,
   })
@@ -29,7 +31,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
 
     const petCollection = client.db("assignmentDB").collection("petlist");
     const donationCollection = client.db("assignmentDB").collection("donation");
@@ -68,6 +70,46 @@ async function run() {
       }
       next();
     };
+
+    app.get("/adoption-requests", async (req, res) => {
+       
+      try {
+
+        const allAdoptionRequests = await adoptCollection.find({}).toArray()
+        const finallyAdoptionRequests = []
+        
+        for (const val of allAdoptionRequests) {
+          const petInfo = await assignmentCollection.findOne({ _id: new ObjectId(val.petId) });
+          console.log(petInfo.email, req.query.user)
+          if (petInfo && petInfo.email == req.query.user && petInfo.status=="APPLIED") {
+            finallyAdoptionRequests.push(val);
+          }
+        }
+        
+        res.send(finallyAdoptionRequests);
+      } catch (error) {
+        console.error("Error fetching adoption requests:", error);
+        res.status(500).json({ error: "Failed to fetch adoption requests" });
+      }
+    });
+    
+  app.patch("/adoption-requests/:id", async (req, res) => {
+    const requestId = req.params.id;
+    const { status } = req.body;
+
+    try {
+        const result = await assignmentCollection.updateOne(
+            { _id: new ObjectId(requestId) },
+            { $set: { status } }
+        );
+        res.send(result);
+    } catch (error) {
+        console.error("Error updating adoption status:", error);
+        res.status(500).json({ error: "Failed to update adoption status" });
+    }
+});
+
+     
 
     // user releted api
 
@@ -134,7 +176,7 @@ async function run() {
 
     // Get all pets
     app.get("/pets", async (req, res) => {
-      const cursor = assignmentCollection.find();
+      const cursor = assignmentCollection.find({status: "POSTED"});
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -210,11 +252,15 @@ app.put('/pets/:id', async (req, res) => {
     // Add a new adoption request
     app.post("/adoption", async (req, res) => {
       const adoptionData = req.body;
+      // petId
       try {
         const result = await client
           .db("assignmentDB")
           .collection("adoptions")
           .insertOne(adoptionData);
+        await assignmentCollection.updateOne({_id: new ObjectId(req.body.petId)},
+        {$set:{status:"APPLIED"}});
+    
         res.send(result);
       } catch (error) {
         console.error("Error creating adoption request:", error);
@@ -233,7 +279,24 @@ app.put('/pets/:id', async (req, res) => {
           .collection("adoptions")
           .find({ userEmail })
           .toArray();
-        res.json(adoptionRequests);
+          const finallyAdoptionRequests = []
+        
+        for (const val of adoptionRequests) {
+          const petInfo = await assignmentCollection.findOne({ _id: new ObjectId(val.petId) });
+          
+          if (petInfo && petInfo.status=="APPROVED") {
+            finallyAdoptionRequests.push({...val,status: "APPROVED"});
+          }
+
+          else if (petInfo && petInfo.status=="REJECTED") {
+            finallyAdoptionRequests.push({...val,status: "REJECTED"});
+          }
+
+          else{
+            finallyAdoptionRequests.push(val)
+          }
+        }
+        res.json(finallyAdoptionRequests);
       } catch (error) {
         console.error("Error fetching adoption requests:", error);
         res.status(500).json({ message: "Internal server error" });
@@ -383,6 +446,7 @@ app.put('/pets/:id', async (req, res) => {
    // Add a new pet
 app.post("/pets", async (req, res) => {
   const newPet = req.body;
+  newPet.status = "POSTED"
   try {
     const result = await assignmentCollection.insertOne(newPet);
     res.send(result);
@@ -676,7 +740,7 @@ app.post('/refund/:donationId', async (req, res) => {
       res.send("Pet adoption API is running.");
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
